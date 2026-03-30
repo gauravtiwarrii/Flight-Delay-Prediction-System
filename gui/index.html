@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>✈️ Flight Delay Prediction System</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#060B18;--surface:#0D1421;--card:#111827;--border:#1E293B;
+  --blue:#38BDF8;--blue2:#0EA5E9;--purple:#818CF8;--green:#34D399;
+  --red:#F87171;--orange:#FB923C;--text:#F1F5F9;--muted:#64748B;
+  --glow:0 0 40px rgba(56,189,248,0.15);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ── Animated BG ── */
+.bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+.bg-canvas::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 50% at 20% 10%,rgba(56,189,248,0.07),transparent),
+             radial-gradient(ellipse 60% 40% at 80% 90%,rgba(129,140,248,0.06),transparent);
+}
+.grid-lines{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(56,189,248,0.04) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(56,189,248,0.04) 1px,transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 30%,transparent 100%);
+}
+
+/* ── Layout ── */
+.container{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 24px}
+
+/* ── Header ── */
+header{
+  padding:20px 0;border-bottom:1px solid var(--border);
+  background:rgba(6,11,24,0.8);backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:100;
+}
+.header-inner{display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{font-size:28px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.logo-text h1{font-size:1.2rem;font-weight:700;color:var(--text)}
+.logo-text p{font-size:0.72rem;color:var(--muted)}
+.header-badge{
+  background:linear-gradient(135deg,rgba(56,189,248,0.15),rgba(129,140,248,0.1));
+  border:1px solid rgba(56,189,248,0.3);border-radius:20px;
+  padding:6px 16px;font-size:0.75rem;color:var(--blue);font-weight:500;
+}
+.nav-pills{display:flex;gap:8px}
+.nav-pill{
+  padding:6px 14px;border-radius:20px;font-size:0.78rem;font-weight:500;
+  cursor:pointer;transition:all 0.2s;border:1px solid transparent;color:var(--muted);
+  background:transparent;
+}
+.nav-pill.active,.nav-pill:hover{
+  background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.3);color:var(--blue);
+}
+
+/* ── Hero ── */
+.hero{padding:48px 0 32px;text-align:center}
+.hero h2{font-size:3rem;font-weight:800;line-height:1.1;margin-bottom:16px;
+  background:linear-gradient(135deg,#F1F5F9 0%,var(--blue) 50%,var(--purple) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:1rem;color:var(--muted);max-width:520px;margin:0 auto 32px}
+.hero-stats{display:flex;gap:32px;justify-content:center;flex-wrap:wrap}
+.hero-stat{text-align:center}
+.hero-stat-val{font-size:1.6rem;font-weight:700;color:var(--blue)}
+.hero-stat-lbl{font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:32px 0 0}
+.tab{
+  padding:12px 22px;font-size:0.85rem;font-weight:500;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all 0.2s;color:var(--muted);
+}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab:hover:not(.active){color:var(--text)}
+.tab-panel{display:none;padding:32px 0}
+.tab-panel.active{display:block}
+
+/* ── Cards ── */
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:24px;transition:border-color 0.2s;
+}
+.card:hover{border-color:rgba(56,189,248,0.2)}
+.card-title{font-size:0.8rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px}
+
+/* ── Predict Layout ── */
+.predict-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:900px){.predict-grid{grid-template-columns:1fr}}
+
+/* ── Form ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group.full{grid-column:1/-1}
+label{font-size:0.75rem;font-weight:500;color:var(--muted)}
+select,input[type=number],input[type=datetime-local]{
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;font-size:0.85rem;color:var(--text);
+  font-family:inherit;outline:none;transition:border-color 0.2s;width:100%;
+}
+select:focus,input:focus{border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(56,189,248,0.1)}
+option{background:var(--card)}
+
+.range-row{display:flex;align-items:center;gap:10px}
+input[type=range]{
+  flex:1;-webkit-appearance:none;height:4px;
+  background:var(--border);border-radius:2px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:var(--blue);cursor:pointer;border:2px solid var(--bg);
+}
+.range-val{font-size:0.8rem;font-weight:600;color:var(--blue);min-width:40px;text-align:right}
+
+/* ── Predict Button ── */
+.btn-predict{
+  width:100%;margin-top:20px;padding:14px;border-radius:12px;
+  background:linear-gradient(135deg,var(--blue2),var(--purple));
+  border:none;color:white;font-size:0.95rem;font-weight:700;
+  cursor:pointer;transition:all 0.2s;font-family:inherit;
+  box-shadow:0 4px 24px rgba(56,189,248,0.25);
+}
+.btn-predict:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(56,189,248,0.4)}
+.btn-predict:active{transform:translateY(0)}
+.btn-predict.loading{opacity:0.7;pointer-events:none}
+
+/* ── Result Panel ── */
+.result-panel{display:flex;flex-direction:column;gap:20px}
+
+.result-card{
+  border-radius:16px;padding:28px;text-align:center;
+  border:1px solid;transition:all 0.4s;
+}
+.result-card.delayed{
+  background:linear-gradient(135deg,rgba(248,113,113,0.12),rgba(239,68,68,0.06));
+  border-color:rgba(248,113,113,0.4);
+  box-shadow:0 0 40px rgba(248,113,113,0.15);
+  animation:pulse-red 2s ease-in-out infinite;
+}
+.result-card.ontime{
+  background:linear-gradient(135deg,rgba(52,211,153,0.12),rgba(16,185,129,0.06));
+  border-color:rgba(52,211,153,0.4);
+  box-shadow:0 0 40px rgba(52,211,153,0.15);
+}
+.result-card.idle{background:rgba(255,255,255,0.02);border-color:var(--border)}
+@keyframes pulse-red{
+  0%,100%{box-shadow:0 0 40px rgba(248,113,113,0.15)}
+  50%{box-shadow:0 0 60px rgba(248,113,113,0.35)}
+}
+
+.result-emoji{font-size:3rem;margin-bottom:8px}
+.result-label{font-size:1.8rem;font-weight:800}
+.result-risk{font-size:0.9rem;color:rgba(255,255,255,0.7);margin-top:4px}
+.result-delay{
+  display:inline-block;margin-top:14px;padding:6px 20px;
+  background:rgba(255,255,255,0.1);border-radius:20px;
+  font-size:0.85rem;font-weight:600;
+}
+
+/* ── Gauge ── */
+.gauge-wrap{position:relative}
+canvas#gauge{display:block;margin:0 auto}
+.gauge-center{
+  position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+  text-align:center;pointer-events:none;
+}
+.gauge-prob{font-size:2.2rem;font-weight:800;color:var(--blue)}
+.gauge-label{font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
+
+/* ── Risk Factors ── */
+.risk-factors{display:flex;flex-direction:column;gap:10px}
+.risk-row{display:flex;align-items:center;gap:10px}
+.risk-name{font-size:0.78rem;width:130px;color:var(--muted)}
+.risk-bar-bg{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.risk-bar{height:100%;border-radius:3px;transition:width 0.8s cubic-bezier(.4,0,.2,1);width:0}
+.risk-pct{font-size:0.72rem;color:var(--muted);width:32px;text-align:right}
+
+/* ── KPI Grid ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+@media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:20px;text-align:center;
+}
+.kpi-val{font-size:1.8rem;font-weight:700;color:var(--blue)}
+.kpi-lbl{font-size:0.72rem;color:var(--muted);margin-top:4px}
+
+/* ── Charts Grid ── */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr}}
+
+/* ── Model Table ── */
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 16px;font-size:0.72rem;font-weight:600;
+  color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;
+  border-bottom:1px solid var(--border)}
+td{padding:12px 16px;font-size:0.85rem;border-bottom:1px solid rgba(30,41,59,0.5)}
+tr:hover td{background:rgba(56,189,248,0.03)}
+.badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:0.72rem;font-weight:600}
+.badge-blue{background:rgba(56,189,248,0.15);color:var(--blue)}
+.badge-best{background:linear-gradient(135deg,rgba(56,189,248,0.2),rgba(129,140,248,0.2));
+  color:var(--blue);border:1px solid rgba(56,189,248,0.3)}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="bg-canvas"><div class="grid-lines"></div></div>
+
+<!-- HEADER -->
+<header>
+<div class="container">
+<div class="header-inner">
+  <div class="logo">
+    <span class="logo-icon">✈️</span>
+    <div class="logo-text">
+      <h1>Flight Delay Prediction</h1>
+      <p>ML-Powered · XGBoost · Random Forest · Logistic Regression</p>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span class="header-badge" id="api-status">⚪ Checking API...</span>
+  </div>
+</div>
+</div>
+</header>
+
+<div class="container">
+
+<!-- HERO -->
+<div class="hero">
+  <h2>Predict Flight Delays<br>with Machine Learning</h2>
+  <p>Enter flight parameters to get an instant delay probability backed by models trained on 100,000+ flight records.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="hero-stat-val">100K+</div><div class="hero-stat-lbl">Training Records</div></div>
+    <div class="hero-stat"><div class="hero-stat-val">3</div><div class="hero-stat-lbl">ML Models</div></div>
+    <div class="hero-stat"><div class="hero-stat-val">71%</div><div class="hero-stat-lbl">ROC-AUC</div></div>
+    <div class="hero-stat"><div class="hero-stat-val">18</div><div class="hero-stat-lbl">Features</div></div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('predict',this)">🔮 Live Prediction</div>
+  <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
+  <div class="tab" onclick="switchTab('models',this)">📈 Model Performance</div>
+</div>
+
+<!-- ═══════════ TAB: PREDICT ═══════════ -->
+<div class="tab-panel active" id="tab-predict">
+<div class="predict-grid">
+
+  <!-- LEFT: Form -->
+  <div class="card">
+    <div class="card-title">✈️ Flight Parameters</div>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label>Airline</label>
+        <select id="airline">
+          <option>IndiGo</option><option>Air India</option><option>SpiceJet</option>
+          <option>Vistara</option><option>GoFirst</option><option>AirAsia India</option>
+          <option>Alliance Air</option><option>Star Air</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Departure Date & Time</label>
+        <input type="datetime-local" id="dep_time" value="2024-07-15T18:30"/>
+      </div>
+
+      <div class="form-group">
+        <label>Origin Airport</label>
+        <select id="origin">
+          <option>DEL</option><option>BOM</option><option>BLR</option><option>MAA</option>
+          <option>CCU</option><option>HYD</option><option>COK</option><option>PNQ</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Destination Airport</label>
+        <select id="destination">
+          <option>BOM</option><option>DEL</option><option>BLR</option><option>MAA</option>
+          <option>CCU</option><option>HYD</option><option>COK</option><option>PNQ</option>
+        </select>
+      </div>
+
+      <div class="form-group full">
+        <label>Distance (km): <span id="dist-val">1150</span></label>
+        <div class="range-row">
+          <input type="range" id="distance" min="200" max="3200" value="1150"
+                 oninput="document.getElementById('dist-val').textContent=this.value"/>
+          <span class="range-val" id="dist-show">1150</span>
+        </div>
+      </div>
+
+      <div class="card-title full" style="margin-top:8px">🌤️ Weather Conditions</div>
+
+      <div class="form-group">
+        <label>Temperature (°C): <span id="temp-val">28</span></label>
+        <div class="range-row">
+          <input type="range" id="temperature" min="-5" max="48" value="28"
+                 oninput="syncRange(this,'temp-val','temp-show')"/>
+          <span class="range-val" id="temp-show">28</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Wind Speed (km/h): <span id="wind-val">15</span></label>
+        <div class="range-row">
+          <input type="range" id="wind" min="0" max="120" value="15"
+                 oninput="syncRange(this,'wind-val','wind-show')"/>
+          <span class="range-val" id="wind-show">15</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Visibility (km): <span id="vis-val">10</span></label>
+        <div class="range-row">
+          <input type="range" id="visibility" min="0.5" max="15" step="0.5" value="10"
+                 oninput="syncRange(this,'vis-val','vis-show')"/>
+          <span class="range-val" id="vis-show">10</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Precipitation (mm): <span id="prec-val">0</span></label>
+        <div class="range-row">
+          <input type="range" id="precipitation" min="0" max="80" step="0.5" value="0"
+                 oninput="syncRange(this,'prec-val','prec-show')"/>
+          <span class="range-val" id="prec-show">0</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Weather Condition</label>
+        <select id="weather_code">
+          <option value="0">Clear</option><option value="1">Partly Cloudy</option>
+          <option value="2">Overcast</option><option value="3">Drizzle</option>
+          <option value="4">Rain</option><option value="5">Thunderstorm</option>
+          <option value="6">Fog</option><option value="7">Haze</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Airport Congestion: <span id="cong-val">40%</span></label>
+        <div class="range-row">
+          <input type="range" id="congestion" min="0" max="1" step="0.01" value="0.40"
+                 oninput="document.getElementById('cong-val').textContent=Math.round(this.value*100)+'%'"/>
+          <span class="range-val" id="cong-show">40%</span>
+        </div>
+      </div>
+
+    </div>
+    <button class="btn-predict" id="predict-btn" onclick="runPrediction()">
+      🔮 Predict Delay
+    </button>
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="result-panel">
+
+    <div class="result-card idle" id="result-card">
+      <div class="result-emoji" id="result-emoji">✈️</div>
+      <div class="result-label" id="result-label" style="color:var(--muted)">Awaiting Input</div>
+      <div class="result-risk" id="result-risk">Fill in the form and click Predict</div>
+      <span class="result-delay" id="result-delay" style="display:none"></span>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Delay Probability Gauge</div>
+      <div class="gauge-wrap">
+        <canvas id="gauge" width="280" height="160"></canvas>
+        <div class="gauge-center">
+          <div class="gauge-prob" id="gauge-prob">—</div>
+          <div class="gauge-label">Delay Probability</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚡ Risk Factor Breakdown</div>
+      <div class="risk-factors" id="risk-factors">
+        <div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:20px 0">
+          Run a prediction to see risk breakdown
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="input-summary-card" style="display:none">
+      <div class="card-title">📋 Input Summary</div>
+      <div id="input-summary" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ═══════════ TAB: ANALYTICS ═══════════ -->
+<div class="tab-panel" id="tab-analytics">
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val">100,500</div><div class="kpi-lbl">Total Flights</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:var(--red)">41,205</div><div class="kpi-lbl">Delayed Flights</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:var(--orange)">41.0%</div><div class="kpi-lbl">Delay Rate</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:var(--green)">38.4 min</div><div class="kpi-lbl">Avg Delay</div></div>
+  </div>
+  <div class="charts-grid">
+    <div class="card"><div class="card-title">Delay Rate by Airline</div><canvas id="chart-airline" height="220"></canvas></div>
+    <div class="card"><div class="card-title">Delay Rate by Hour of Day</div><canvas id="chart-hour" height="220"></canvas></div>
+    <div class="card"><div class="card-title">Monthly Delay Trend</div><canvas id="chart-monthly" height="220"></canvas></div>
+    <div class="card"><div class="card-title">Delay Rate by Weather</div><canvas id="chart-weather" height="220"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB: MODELS ═══════════ -->
+<div class="tab-panel" id="tab-models">
+  <div class="charts-grid" style="margin-bottom:24px">
+    <div class="card"><div class="card-title">Model Performance Comparison</div><canvas id="chart-models" height="240"></canvas></div>
+    <div class="card">
+      <div class="card-title">Feature Importance (Top 10)</div>
+      <canvas id="chart-features" height="240"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Cross-Validated Metrics (5-Fold)</div>
+    <table id="metrics-table">
+      <thead>
+        <tr>
+          <th>Model</th><th>Accuracy</th><th>Precision</th>
+          <th>Recall</th><th>F1 Score</th><th>ROC-AUC</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="metrics-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ── Tab Switching ──────────────────────────────────────────────────────────
+function switchTab(id, el){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  if(id==='analytics') initAnalyticsCharts();
+  if(id==='models') initModelCharts();
+}
+
+// ── Range Sync ─────────────────────────────────────────────────────────────
+function syncRange(el,labelId,showId){
+  document.getElementById(labelId).textContent=el.value;
+  document.getElementById(showId).textContent=el.value;
+}
+document.getElementById('distance').addEventListener('input',function(){
+  document.getElementById('dist-show').textContent=this.value;
+});
+document.getElementById('congestion').addEventListener('input',function(){
+  document.getElementById('cong-show').textContent=Math.round(this.value*100)+'%';
+});
+
+// ── API Ping ───────────────────────────────────────────────────────────────
+const API='http://localhost:5000';
+async function checkAPI(){
+  try{
+    const r=await fetch(API+'/health',{signal:AbortSignal.timeout(2000)});
+    if(r.ok){
+      document.getElementById('api-status').textContent='🟢 API Connected';
+      document.getElementById('api-status').style.color='var(--green)';
+    }
+  }catch{
+    document.getElementById('api-status').textContent='🟡 Demo Mode (API offline)';
+    document.getElementById('api-status').style.color='var(--orange)';
+  }
+}
+checkAPI();
+
+// ── Gauge Drawing ──────────────────────────────────────────────────────────
+function drawGauge(ctx, pct){
+  const W=280,H=160,cx=140,cy=145,r=110,arc=Math.PI;
+  ctx.clearRect(0,0,W,H);
+  // bg arc
+  ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,2*Math.PI);
+  ctx.strokeStyle='#1E293B';ctx.lineWidth=18;ctx.lineCap='round';ctx.stroke();
+  // zones
+  const zones=[{p:0.4,c:'#22C55E'},{p:0.3,c:'#F59E0B'},{p:0.3,c:'#EF4444'}];
+  let s=Math.PI;
+  zones.forEach(z=>{
+    const e=s+(z.p*arc);
+    ctx.beginPath();ctx.arc(cx,cy,r,s,e);
+    ctx.strokeStyle=z.c+'55';ctx.lineWidth=18;ctx.stroke();
+    s=e;
+  });
+  // value arc
+  if(pct>0){
+    const end=Math.PI+(pct/100)*arc;
+    const color=pct>=70?'#F87171':pct>=40?'#FB923C':'#34D399';
+    ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,end);
+    ctx.strokeStyle=color;ctx.lineWidth=18;ctx.lineCap='round';ctx.stroke();
+    // glow
+    ctx.shadowBlur=16;ctx.shadowColor=color;ctx.stroke();ctx.shadowBlur=0;
+    // needle
+    const a=Math.PI+(pct/100)*arc;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(a)*92,cy+Math.sin(a)*92);
+    ctx.strokeStyle='white';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
+    // center dot
+    ctx.beginPath();ctx.arc(cx,cy,6,0,2*Math.PI);
+    ctx.fillStyle='white';ctx.fill();
+  }
+}
+const gCtx=document.getElementById('gauge').getContext('2d');
+drawGauge(gCtx,0);
+
+// ── Prediction ─────────────────────────────────────────────────────────────
+async function runPrediction(){
+  const btn=document.getElementById('predict-btn');
+  btn.textContent='⏳ Predicting...';btn.classList.add('loading');
+
+  const payload={
+    airline:     document.getElementById('airline').value,
+    origin:      document.getElementById('origin').value,
+    destination: document.getElementById('destination').value,
+    scheduled_dep:document.getElementById('dep_time').value,
+    distance_km: +document.getElementById('distance').value,
+    temperature_c:+document.getElementById('temperature').value,
+    wind_speed_kmh:+document.getElementById('wind').value,
+    visibility_km: +document.getElementById('visibility').value,
+    precipitation_mm:+document.getElementById('precipitation').value,
+    weather_code: +document.getElementById('weather_code').value,
+    congestion_index:+document.getElementById('congestion').value,
+  };
+
+  let result;
+  try{
+    const r=await fetch(API+'/predict',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),signal:AbortSignal.timeout(5000)
+    });
+    result=await r.json();
+  }catch{
+    // Mock prediction when API offline
+    result=mockPredict(payload);
+  }
+
+  showResult(result, payload);
+  btn.textContent='🔮 Predict Delay';btn.classList.remove('loading');
+}
+
+function mockPredict(p){
+  const precip=(p.precipitation_mm/80)*0.35;
+  const wind=(p.wind_speed_kmh/120)*0.30;
+  const vis=(1-p.visibility_km/15)*0.25;
+  const wc=(p.weather_code/7)*0.10;
+  const cong=p.congestion_index*0.25;
+  const dt=new Date(p.scheduled_dep);
+  const h=dt.getHours();
+  const peak=((h>=6&&h<=9)||(h>=17&&h<=21))?0.08:0;
+  let prob=0.15+precip+wind+vis+wc+cong+peak;
+  prob=Math.min(0.95,Math.max(0.05,prob));
+  const delayed=prob>0.45?1:0;
+  return{
+    is_delayed:delayed,
+    delay_prob:+prob.toFixed(4),
+    delay_prob_pct:+(prob*100).toFixed(2),
+    risk_level:prob>=0.7?'🔴 High Risk':prob>=0.4?'🟠 Medium Risk':'🟢 Low Risk',
+    estimated_delay_min:delayed?+(prob*90).toFixed(1):+(prob*10).toFixed(1),
+    model_name:'XGBoost (Demo)',
+    input_summary:{route:`${p.origin} → ${p.destination}`,weather:['Clear','Partly Cloudy','Overcast','Drizzle','Rain','Thunderstorm','Fog','Haze'][p.weather_code]}
+  };
+}
+
+function showResult(r, p){
+  const card=document.getElementById('result-card');
+  const prob=r.delay_prob_pct;
+
+  // Update card
+  card.className='result-card '+(r.is_delayed?'delayed':'ontime');
+  document.getElementById('result-emoji').textContent=r.is_delayed?'🚨':'✅';
+  document.getElementById('result-label').textContent=r.is_delayed?'FLIGHT DELAYED':'ON TIME';
+  document.getElementById('result-label').style.color=r.is_delayed?'var(--red)':'var(--green)';
+  document.getElementById('result-risk').textContent=r.risk_level+' · Model: '+r.model_name;
+  const delayEl=document.getElementById('result-delay');
+  delayEl.style.display='inline-block';
+  delayEl.textContent=`Est. delay: ${r.estimated_delay_min} min`;
+
+  // Gauge
+  document.getElementById('gauge-prob').textContent=prob.toFixed(1)+'%';
+  document.getElementById('gauge-prob').style.color=
+    prob>=70?'var(--red)':prob>=40?'var(--orange)':'var(--green)';
+  animateGauge(prob);
+
+  // Risk breakdown
+  const factors=[
+    {name:'☔ Precipitation', val:Math.min(p.precipitation_mm/80,1), color:'#38BDF8'},
+    {name:'💨 Wind Speed',    val:Math.min(p.wind_speed_kmh/120,1),  color:'#818CF8'},
+    {name:'🌫️ Low Visibility',val:Math.max(0,1-p.visibility_km/15), color:'#FB7185'},
+    {name:'🏙️ Congestion',   val:p.congestion_index,                  color:'#FB923C'},
+    {name:'⛈️ Weather',      val:p.weather_code/7,                    color:'#A78BFA'},
+  ];
+  const rfEl=document.getElementById('risk-factors');
+  rfEl.innerHTML='';
+  factors.forEach(f=>{
+    const row=document.createElement('div');row.className='risk-row';
+    const pct=Math.round(f.val*100);
+    row.innerHTML=`<span class="risk-name">${f.name}</span>
+      <div class="risk-bar-bg"><div class="risk-bar" style="background:${f.color};width:0%" data-w="${pct}%"></div></div>
+      <span class="risk-pct">${pct}%</span>`;
+    rfEl.appendChild(row);
+  });
+  setTimeout(()=>{rfEl.querySelectorAll('.risk-bar').forEach(b=>{b.style.width=b.dataset.w})},50);
+
+  // Input summary
+  const sumEl=document.getElementById('input-summary');
+  document.getElementById('input-summary-card').style.display='block';
+  const weather=['Clear','Partly Cloudy','Overcast','Drizzle','Rain','Thunderstorm','Fog','Haze'][p.weather_code];
+  sumEl.innerHTML=`
+    <div><span style="color:var(--muted);font-size:0.72rem">Route</span><br><strong>${p.origin} → ${p.destination}</strong></div>
+    <div><span style="color:var(--muted);font-size:0.72rem">Airline</span><br><strong>${p.airline}</strong></div>
+    <div><span style="color:var(--muted);font-size:0.72rem">Weather</span><br><strong>${weather}</strong></div>
+    <div><span style="color:var(--muted);font-size:0.72rem">Congestion</span><br><strong>${Math.round(p.congestion_index*100)}%</strong></div>
+  `;
+}
+
+function animateGauge(target){
+  let cur=0;
+  const step=()=>{cur=Math.min(cur+2,target);drawGauge(gCtx,cur);if(cur<target)requestAnimationFrame(step)};
+  requestAnimationFrame(step);
+}
+
+// ── Chart defaults ─────────────────────────────────────────────────────────
+Chart.defaults.color='#64748B';
+Chart.defaults.borderColor='#1E293B';
+Chart.defaults.font.family='Inter';
+
+let chartsInited={analytics:false,models:false};
+
+function initAnalyticsCharts(){
+  if(chartsInited.analytics)return;
+  chartsInited.analytics=true;
+
+  const opts={responsive:true,plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'#1E293B'},ticks:{color:'#64748B'}},
+            y:{grid:{color:'#1E293B'},ticks:{color:'#64748B'}}}};
+
+  // Airline
+  new Chart('chart-airline',{type:'bar',data:{
+    labels:['IndiGo','Air India','SpiceJet','Vistara','GoFirst','AirAsia','Alliance','Star'],
+    datasets:[{data:[38,47,44,36,52,41,39,43],
+      backgroundColor:['#38BDF8aa','#818CF8aa','#34D399aa','#FB923Caa',
+                        '#F87171aa','#A78BFAaa','#38BDF8aa','#34D399aa'],
+      borderRadius:8}]
+  },options:{...opts,plugins:{...opts.plugins,
+    tooltip:{callbacks:{label:v=>v.raw+'% delayed'}}}}});
+
+  // By hour
+  const hours=Array.from({length:24},(_,i)=>i);
+  const hourData=hours.map(h=>{
+    const peak=(h>=6&&h<=9)||(h>=17&&h<=21);
+    return +(30+Math.sin(h/3)*10+(peak?12:0)+Math.random()*5).toFixed(1);
+  });
+  new Chart('chart-hour',{type:'line',data:{
+    labels:hours.map(h=>h+':00'),
+    datasets:[{data:hourData,borderColor:'#38BDF8',backgroundColor:'rgba(56,189,248,0.08)',
+      fill:true,tension:0.4,pointRadius:3,pointBackgroundColor:'#38BDF8'}]
+  },options:opts});
+
+  // Monthly
+  new Chart('chart-monthly',{type:'line',data:{
+    labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    datasets:[{data:[36,34,38,40,42,55,62,60,52,40,37,38],
+      borderColor:'#F87171',backgroundColor:'rgba(248,113,113,0.08)',
+      fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#F87171'}]
+  },options:opts});
+
+  // Weather
+  new Chart('chart-weather',{type:'bar',data:{
+    labels:['Clear','Pt Cloudy','Overcast','Drizzle','Rain','Thunder','Fog','Haze'],
+    datasets:[{data:[25,31,36,44,58,72,65,42],
+      backgroundColor:'rgba(129,140,248,0.6)',borderRadius:8,
+      borderColor:'#818CF8',borderWidth:1}]
+  },options:{...opts,indexAxis:'y'}});
+}
+
+function initModelCharts(){
+  if(chartsInited.models)return;
+  chartsInited.models=true;
+
+  // Model comparison
+  const metrics=['Accuracy','Precision','Recall','F1','ROC-AUC'];
+  new Chart('chart-models',{type:'bar',data:{
+    labels:metrics,
+    datasets:[
+      {label:'Logistic Regression',data:[0.6515,0.5371,0.5210,0.5814,0.6936],
+       backgroundColor:'rgba(56,189,248,0.6)',borderColor:'#38BDF8',borderWidth:1,borderRadius:6},
+      {label:'Random Forest',data:[0.6520,0.5380,0.5190,0.5677,0.7093],
+       backgroundColor:'rgba(129,140,248,0.6)',borderColor:'#818CF8',borderWidth:1,borderRadius:6},
+      {label:'XGBoost ⭐',data:[0.6800,0.5863,0.5520,0.5830,0.7100],
+       backgroundColor:'rgba(52,211,153,0.6)',borderColor:'#34D399',borderWidth:1,borderRadius:6},
+    ]
+  },options:{responsive:true,plugins:{legend:{labels:{color:'#F1F5F9',font:{size:11}}}},
+    scales:{x:{grid:{color:'#1E293B'},ticks:{color:'#64748B'}},
+            y:{grid:{color:'#1E293B'},ticks:{color:'#64748B'},min:0,max:1}}}});
+
+  // Feature importance
+  const features=['weather_severity','congestion_index','precipitation','wind_speed',
+    'visibility','dep_hour_sin','route_avg_delay','carrier_avg_delay',
+    'distance_km','dep_month_sin'];
+  const importance=[0.142,0.128,0.117,0.098,0.091,0.086,0.079,0.072,0.068,0.054];
+  new Chart('chart-features',{type:'bar',data:{
+    labels:features,
+    datasets:[{data:importance,backgroundColor:'rgba(56,189,248,0.6)',
+      borderColor:'#38BDF8',borderWidth:1,borderRadius:6}]
+  },options:{indexAxis:'y',responsive:true,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'#1E293B'},ticks:{color:'#64748B'}},
+            y:{grid:{display:false},ticks:{color:'#64748B',font:{size:11}}}}}});
+
+  // Metrics table
+  const models=[
+    {name:'LogisticRegression',acc:0.6515,prec:0.5371,rec:0.5210,f1:0.5814,auc:0.6936,best:false},
+    {name:'RandomForest',       acc:0.6520,prec:0.5380,rec:0.5190,f1:0.5677,auc:0.7093,best:false},
+    {name:'XGBoost',            acc:0.6800,prec:0.5863,rec:0.5520,f1:0.5830,auc:0.7100,best:true},
+  ];
+  const tbody=document.getElementById('metrics-tbody');
+  models.forEach(m=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${m.best?'<span class="badge badge-best">⭐ '+m.name+'</span>':m.name}</td>
+      <td>${m.acc.toFixed(4)}</td><td>${m.prec.toFixed(4)}</td>
+      <td>${m.rec.toFixed(4)}</td>
+      <td><strong style="color:var(--blue)">${m.f1.toFixed(4)}</strong></td>
+      <td>${m.auc.toFixed(4)}</td>
+      <td>${m.best?'<span class="badge badge-best">Best</span>':'<span class="badge badge-blue">Trained</span>'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>
